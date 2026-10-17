@@ -1,10 +1,9 @@
+
 import 'dart:convert';
 
 import 'package:field_survey/screens/auth/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-
-// import 'login.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,13 +13,21 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  // CONTROLLER
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final phoneController = TextEditingController();
 
   String? selectedGender;
-
   bool isLoading = false;
+
+  // WARNA OLED BLACK
+  static const Color primaryColor = Color(0xFFD4D4D8);
+  static const Color backgroundColor = Color(0xFF000000);
+  static const Color textColor = Color(0xFFFFFFFF);
+  static const Color secondaryTextColor = Color(0xFF9CA3AF);
+  static const Color softBlueColor = Color(0xFF171717);
+  static const Color borderColor = Color(0xFF333333);
 
   @override
   void dispose() {
@@ -30,17 +37,52 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  // =========================
+  // PESAN
+  void showMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor:
+            isError ? const Color(0xFFDC2626) : const Color(0xFF262626),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
   // REGISTER
-  // =========================
   Future<void> register() async {
-    if (nameController.text.trim().isEmpty ||
-        selectedGender == null ||
-        emailController.text.trim().isEmpty ||
-        phoneController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Semua data harus diisi')));
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final phone = phoneController.text.trim();
+
+    if (name.isEmpty) {
+      showMessage('Nama harus diisi.', isError: true);
+      return;
+    }
+
+    if (selectedGender == null) {
+      showMessage('Jenis kelamin harus dipilih.', isError: true);
+      return;
+    }
+
+    if (email.isEmpty) {
+      showMessage('Email harus diisi.', isError: true);
+      return;
+    }
+
+    if (!email.contains('@')) {
+      showMessage('Format email tidak valid.', isError: true);
+      return;
+    }
+
+    if (phone.isEmpty) {
+      showMessage('Nomor telepon harus diisi.', isError: true);
       return;
     }
 
@@ -56,44 +98,81 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'name': nameController.text.trim(),
-          'gender': selectedGender!,
-          'email': emailController.text.trim(),
-          'phone': phoneController.text.trim(),
+          'name': name,
+          'gender': selectedGender,
+          'email': email,
+          'phone': phone,
         }),
       );
 
+      debugPrint('================================');
+      debugPrint('REGISTER');
+      debugPrint('STATUS: ${response.statusCode}');
+      debugPrint('BODY: ${response.body}');
+      debugPrint('================================');
+
       if (!mounted) return;
 
-      print('STATUS: ${response.statusCode}');
-      print('BODY: ${response.body}');
+      dynamic data;
 
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['message']?.toString() ?? 'Registrasi berhasil'),
-          ),
-        );
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['message']?.toString() ?? 'Registrasi gagal'),
-          ),
-        );
+      try {
+        data = jsonDecode(response.body);
+      } catch (e) {
+        data = {};
       }
+
+      // REGISTER BERHASIL
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        showMessage(
+          data is Map
+              ? data['message']?.toString() ?? 'Registrasi berhasil.'
+              : 'Registrasi berhasil.',
+        );
+
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        if (!mounted) return;
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const LoginScreen(),
+          ),
+          (route) => false,
+        );
+
+        return;
+      }
+
+      // REGISTER GAGAL
+      String message = 'Registrasi gagal. Silakan coba lagi.';
+
+      if (data is Map) {
+        message = data['message']?.toString() ?? message;
+
+        if (data['errors'] is Map) {
+          final errors = data['errors'] as Map;
+
+          if (errors.isNotEmpty) {
+            final firstError = errors.values.first;
+
+            if (firstError is List && firstError.isNotEmpty) {
+              message = firstError.first.toString();
+            }
+          }
+        }
+      }
+
+      showMessage(message, isError: true);
     } catch (e) {
+      debugPrint('REGISTER ERROR: $e');
+
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
+      showMessage(
+        'Terjadi kesalahan. Periksa koneksi internet kamu.',
+        isError: true,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -103,50 +182,93 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  // INPUT
+  InputDecoration inputDecoration({
+    required String hintText,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: secondaryTextColor,
+        fontSize: 14,
+      ),
+      prefixIcon: Icon(icon, color: primaryColor),
+      filled: true,
+      fillColor: softBlueColor,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 16,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: primaryColor,
+          width: 1.5,
+        ),
+      ),
+    );
+  }
+
+  // BUILD
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-
+      backgroundColor: backgroundColor,
+      appBar: AppBar(
+        backgroundColor: backgroundColor,
+        foregroundColor: textColor,
+        elevation: 0,
+        centerTitle: false,
+        title: const Text(
+          'Buat Akun',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
       body: SafeArea(
+        top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 35),
+              const SizedBox(height: 10),
 
-              // =========================
-              // ICON
-              // =========================
+              // HEADER
               Center(
                 child: Container(
-                  width: 90,
-                  height: 90,
+                  width: 85,
+                  height: 85,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE0F2EF),
-                    borderRadius: BorderRadius.circular(25),
+                    color: softBlueColor,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: borderColor),
                   ),
                   child: const Icon(
                     Icons.person_add_alt_1_rounded,
-                    size: 50,
-                    color: Color(0xFF2E7D6B),
+                    size: 45,
+                    color: primaryColor,
                   ),
                 ),
               ),
 
-              const SizedBox(height: 25),
+              const SizedBox(height: 24),
 
-              // =========================
-              // JUDUL
-              // =========================
               const Center(
                 child: Text(
                   'Daftar Akun',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF263238),
+                    color: textColor,
                   ),
                 ),
               ),
@@ -155,217 +277,231 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
               const Center(
                 child: Text(
-                  'Isi data diri untuk membuat akun Field Survey',
+                  'Lengkapi data di bawah untuk membuat akun\nField Survey kamu.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 15, color: Color(0xFF78909C)),
-                ),
-              ),
-
-              const SizedBox(height: 35),
-
-              // =========================
-              // NAME
-              // =========================
-              const Text(
-                'Nama',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF37474F),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              TextField(
-                controller: nameController,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  hintText: 'Masukkan nama lengkap',
-                  prefixIcon: const Icon(Icons.person_outline),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
-                    borderSide: BorderSide.none,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: secondaryTextColor,
+                    height: 1.5,
                   ),
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
 
-              // =========================
-              // GENDER
-              // =========================
-              const Text(
-                'Jenis Kelamin',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF37474F),
+              // FORM CARD
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: softBlueColor,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // NAMA
+                    const Text(
+                      'Nama Lengkap',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    TextField(
+                      controller: nameController,
+                      style: const TextStyle(color: textColor),
+                      textInputAction: TextInputAction.next,
+                      decoration: inputDecoration(
+                        hintText: 'Masukkan nama lengkap',
+                        icon: Icons.person_outline,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // JENIS KELAMIN
+                    const Text(
+                      'Jenis Kelamin',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    DropdownButtonFormField<String>(
+                      value: selectedGender,
+                      isExpanded: true,
+                      dropdownColor: softBlueColor,
+                      style: const TextStyle(color: textColor),
+                      decoration: inputDecoration(
+                        hintText: 'Pilih jenis kelamin',
+                        icon: Icons.wc_outlined,
+                      ),
+                      items: const [
+                        DropdownMenuItem<String>(
+                          value: 'L',
+                          child: Text('Laki-Laki'),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: 'P',
+                          child: Text('Perempuan'),
+                        ),
+                      ],
+                      onChanged: isLoading
+                          ? null
+                          : (value) {
+                              setState(() {
+                                selectedGender = value;
+                              });
+                            },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // EMAIL
+                    const Text(
+                      'Email',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    TextField(
+                      controller: emailController,
+                      style: const TextStyle(color: textColor),
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      decoration: inputDecoration(
+                        hintText: 'Masukkan alamat email',
+                        icon: Icons.email_outlined,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // TELEPON
+                    const Text(
+                      'Nomor Telepon',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    TextField(
+                      controller: phoneController,
+                      style: const TextStyle(color: textColor),
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) {
+                        if (!isLoading) {
+                          register();
+                        }
+                      },
+                      decoration: inputDecoration(
+                        hintText: 'Contoh: 081234567890',
+                        icon: Icons.phone_outlined,
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
 
-              DropdownButtonFormField<String>(
-                value: selectedGender,
-                decoration: InputDecoration(
-                  hintText: 'Pilih jenis kelamin',
-                  prefixIcon: const Icon(Icons.wc_outlined),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'L',
-                    child: Text('Laki-Laki'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'P',
-                    child: Text('Perempuan'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    selectedGender = value;
-                  });
-                },
-              ),
-
-              const SizedBox(height: 20),
-
-              // =========================
-              // EMAIL
-              // =========================
-              const Text(
-                'Email',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF37474F),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  hintText: 'Masukkan email',
-                  prefixIcon: const Icon(Icons.email_outlined),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // =========================
-              // PHONE
-              // =========================
-              const Text(
-                'Nomor Telepon',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF37474F),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => register(),
-                decoration: InputDecoration(
-                  hintText: 'Masukkan nomor telepon',
-                  prefixIcon: const Icon(Icons.phone_outlined),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              // =========================
-              // TOMBOL DAFTAR
-              // =========================
+              // BUTTON REGISTER
               SizedBox(
                 width: double.infinity,
-                height: 55,
+                height: 54,
                 child: ElevatedButton(
                   onPressed: isLoading ? null : register,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D6B),
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: const Color(0xFF80AFA4),
+                    backgroundColor: primaryColor,
+                    foregroundColor: backgroundColor,
+                    disabledBackgroundColor: const Color(0xFF525252),
+                    disabledForegroundColor: secondaryTextColor,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
                   child: isLoading
                       ? const SizedBox(
-                          width: 25,
-                          height: 25,
+                          width: 24,
+                          height: 24,
                           child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
+                            color: backgroundColor,
+                            strokeWidth: 2.5,
                           ),
                         )
-                      : const Text(
-                          'Daftar',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.person_add_alt_1),
+                            SizedBox(width: 10),
+                            Text(
+                              'Daftar Sekarang',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
-              // =========================
-              // KEMBALI KE LOGIN
-              // =========================
+              // LOGIN
               Center(
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    'Sudah punya akun? Login',
-                    style: TextStyle(
-                      color: Color(0xFF2E7D6B),
-                      fontWeight: FontWeight.w600,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Sudah punya akun?',
+                      style: TextStyle(color: secondaryTextColor),
                     ),
-                  ),
+                    TextButton(
+                      onPressed: isLoading
+                          ? null
+                          : () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const LoginScreen(),
+                                ),
+                              );
+                            },
+                      child: const Text(
+                        'Login',
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              const SizedBox(height: 15),
+              const SizedBox(height: 20),
             ],
           ),
         ),

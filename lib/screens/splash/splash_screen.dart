@@ -1,7 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:field_survey/screens/auth/login_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../auth/login_screen.dart';
+import '../dashboard/home.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -11,86 +12,127 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  // WARNA APLIKASI OLED BLACK
+  static const Color primaryColor = Color(0xFFD4D4D8);
+  static const Color backgroundColor = Color(0xFF000000);
+  static const Color textColor = Color(0xFFFFFFFF);
+  static const Color secondaryTextColor = Color(0xFF9CA3AF);
+  static const Color softBlueColor = Color(0xFF171717);
+
   @override
   void initState() {
     super.initState();
-
-    Timer(const Duration(seconds: 3), () {
-      Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const LoginScreen(),
-      ),
-    );
-    });
+    checkSession();
   }
 
+  // CEK SESSION LOGIN
+  Future<void> checkSession() async {
+    await Future.delayed(const Duration(seconds: 2));
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (!mounted) return;
+
+    if (token != null && token.isNotEmpty) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomeScreen(token: token),
+        ),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const LoginScreen(),
+        ),
+      );
+    }
+  }
+
+  // BUILD
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+      backgroundColor: backgroundColor,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // LOGO
+                Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    color: softBlueColor,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withValues(alpha: 0.10),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: const Icon(
-                Icons.location_on_rounded,
-                size: 65,
-                color: Color(0xFF2E7D6B),
-              ),
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    size: 58,
+                    color: primaryColor,
+                  ),
+                ),
+
+                const SizedBox(height: 28),
+
+                // NAMA APLIKASI
+                const Text(
+                  'Field Survey',
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                const Text(
+                  'Kelola data survei lapangan dengan mudah',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: secondaryTextColor,
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                // LOADING
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    color: primaryColor,
+                    strokeWidth: 3,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                const Text(
+                  'Memuat aplikasi...',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: secondaryTextColor,
+                  ),
+                ),
+              ],
             ),
-
-            const SizedBox(height: 30),
-
-            const Text(
-              'Field Survey',
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF263238),
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            const Text(
-              'Solusi mudah untuk melakukan survei lapangan',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 15, color: Color(0xFF78909C)),
-            ),
-
-            const SizedBox(height: 40),
-
-            const SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                color: Color(0xFF2E7D6B),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            const Text(
-              'Memuat aplikasi...',
-              style: TextStyle(fontSize: 13, color: Color(0xFF90A4AE)),
-            ),
-          ],
+          ),
         ),
       ),
     );
